@@ -1,0 +1,47 @@
+from enum import Enum
+import struct
+
+UNICODE = 'utf-8'
+
+SOURCE_ID_LEN = 4
+MESSAGE_TYPE_LEN = 4
+MESSAGE_LENGTH_LEN = 4
+HEADER_LEN = SOURCE_ID_LEN + MESSAGE_TYPE_LEN + MESSAGE_LENGTH_LEN
+
+class MessageType(Enum):
+    ACK = 1
+    NACK = 2
+    BYE = 3
+    INFO = 4
+
+class Packet:
+    def __init__(self, source_id, message_type, message):
+        self.source_id = source_id
+        self.message_type = message_type
+        self.message = message
+
+    def to_bytes(self):
+        message_bytes = self.message.encode(UNICODE)
+
+        # source_id (int) için 4 byte,
+        # !I: Big-endian formatında 4 byte (32-bit) unsigned integer
+
+        # message_type (int) için 4 byte,
+        # I: 4 byte (32-bit) unsigned integer
+
+        # message_length için 4 byte :
+        # {len(message_bytes)}s: Mesajın uzunluğu kadar byte içeren string
+
+        # satır sonunda kullandığımız s karakteri byte dizisinin string olarak değerlendirilmesi için
+        # Örneğin !10s ifadesi 10 byte uzunluğunda bir karakter dizisi beklediğimizi söyler
+        packet_format = f'!I I I {len(message_bytes)}s'
+        return struct.pack(packet_format, self.source_id, self.message_type.value, len(message_bytes), message_bytes)
+
+    @staticmethod
+    def from_bytes(data):
+        # İlk 12 byte'ı (source_id, message_type, message_length) çıkarıyoruz
+        source_id, message_type, message_length = struct.unpack('!I I I', data[:HEADER_LEN])
+        # data[HEADER_LEN:HEADER_LEN+message_length]:
+        # mesajın uzunluğu kadar byte alınır ve bu byte dizisi UNICODE formatında çözülerek string'e dönüştürülür
+        message = struct.unpack(f'!{message_length}s', data[HEADER_LEN:HEADER_LEN+message_length])[0].decode(UNICODE)
+        return Packet(source_id, MessageType(message_type), message)
