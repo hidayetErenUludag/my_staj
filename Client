@@ -1,18 +1,22 @@
 import socket
 import threading
+import time
 
-# Constants
-HOST = 'localhost'
-PORT = 12345
+from grapheme.grapheme_property_group import value
+
+from packet import Packet, MessageType
+
+
+HOST = "127.0.0.1"
+PORT = 5555
+CLIENT_ID = 2
 MAX_BYTE = 1024
 
-# Global variables
 client_socket = None
-reconnect_flag = True
+re_connect = False
 
 # Serverdan gelen mesajlari dinler
 def receive_messages(client_socket):
-    global reconnect_flag
     while True:
         try:
             data = client_socket.recv(MAX_BYTE)
@@ -27,39 +31,68 @@ def receive_messages(client_socket):
                 break
         except:
             print("\nBağlantı koptu.")
-            print("Tekrar Bağlanmak istiyor musunuz? Evet ise 1, Hayır ise 2 yazın.")
+            print("Tekrar Bağlanmak istiyor musunuz ? evet ise 1 hayır 2 yazın ")
             try:
-                user_input = int(input())
-                if user_input == 1:
-                    reconnect_flag = True
+                if int(input()) == 1:
+                    re_run = False
+                    start_client(HOST, PORT)
                 else:
-                    reconnect_flag = False
-                break
+                    break
             except ValueError:
                 print("You must enter 1 or 2")
-                reconnect_flag = False
-                break
 
 # TCP client'i başlatir
+
 def start_client(host, port):
-    global client_socket, reconnect_flag
+    receive_thread = None
+    global client_socket
 
-    while reconnect_flag:
-        try:
-            client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-            client_socket.connect((host, port))
-            print("Bağlantı başarılı!")
+    try:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((host, port))
+        print("Bağlantı başarılı!")
 
-            # Mesajlari ayri bir thread ile al
-            receive_thread = threading.Thread(target=receive_messages, args=(client_socket,))
-            receive_thread.start()
-            receive_thread.join()  # Wait for the thread to finish
+        # Mesajlari ayri bir thread ile al
+        if re_connect == True:
+            receive_thread.join()
+        receive_thread = threading.Thread(target=receive_messages, args=(client_socket,))
+        receive_thread.start()
 
-        except Exception as e:
-            print(f"Bağlanamadı: {e}. \n Tekrar deneniyor...")
+    except Exception as e:
+        print(f"Bağlanamadı: {e}. \n Tekrar deneniyor...")
+        time.sleep(5)
+        start_client(host, port)
 
-        if not reconnect_flag:
+
+def input_handler():
+    while True:
+        # Kullanıcıdan alinan mesaji server'a gönder
+        message = input("Mesajınızı yazın: ")
+        if message.lower() != "exit":
+            corr = False
+            x = input("Enter the message type as int 1 = ACK; 2 = NACK; 3 = BYE; 4 = INFO :")
+            input_str = int(x)
+            while not corr:
+                if corr <= 4:
+                    final_type = input_str
+                    corr = True
+        else:
+            final_type = 3
+        packet = Packet(CLIENT_ID, MessageType(final_type), message)
+        send_message(packet)
+
+        if final_type == 3:
+            client_socket.close()
             break
 
-# Start the client
-start_client(HOST, PORT)
+
+def send_message(packet):
+    try:
+        client_socket.send(packet.to_bytes())
+    except Exception as e:
+        print(f"Gönderilemedi: {e}")
+
+
+if __name__ == '__main__':
+    start_client(HOST, PORT)
+    input_handler()
