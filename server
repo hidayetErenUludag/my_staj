@@ -1,0 +1,121 @@
+import socket
+import threading
+import time
+from Base.packet import MessageType, Packet
+
+clients = []
+HOST = "127.0.0.1"
+PORT = 5555
+MAX_BYTE = 1024
+SERVER_ID = 1
+
+# Secili client'a mesaj gönderir
+def send_message_to_client(client_socket, packet):
+    try:
+        if client_socket in clients:
+            client_socket.send(packet.to_bytes())
+    except:
+        print("Mesaj gönderilemedi.")
+
+
+# Her bir client'i işleyen fonksiyon
+def client_handler(client_socket):
+    while True:
+        try:
+            data = client_socket.recv(MAX_BYTE)
+            if data:
+                packet = Packet.from_bytes(data)
+                print(
+                    f"\n**\nGelen Paket: Source ID: {packet.source_id}, "
+                    f"Message Type: {packet.message_type.name},"
+                    f" Message: {packet.message}\n**\n"
+                    f"IP Addres {client_socket.getpeername}")
+
+                if packet.message_type == MessageType.BYE:
+                    clients.remove(client_socket)
+                    client_socket.close()
+                    show_clients()
+                    break
+            else:
+                break
+        except:
+            break
+
+
+
+# TCP sunucusunu başlatir ve gelen client isteklerini kabul eder
+def run_server(host, port):
+    try:
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind((host, port))
+        server.listen(5)
+        print(f"Server {host}:{port} adresi ile başlatıldı.")
+    except Exception as e:
+        print(f"Server başlatılamadı: {e}. \n Tekrar deneniyor...")
+        time.sleep(5)
+        run_server(host, port)
+        return
+
+    while True:
+        try:
+            client_socket, addr = server.accept()
+            print(f"Client: {addr} adresi ile bağlandı.")
+            clients.append(client_socket)
+            client_thread = threading.Thread(target=client_handler, args=(client_socket,))
+            client_thread.start()
+            show_clients()
+
+        except Exception as e:
+            print(f"Hata: {e}")
+
+
+# Kullanici girişini yönetir
+def input_handler():
+    while True:
+        if len(clients) > 0:
+            # Bağlı olan ,clientlarin listesini göster
+            show_clients()
+
+            user_input = input("Mesaj göndermek için client indeksini girin (çıkmak için 'exit' yazın): ")
+
+            if user_input.lower() == 'exit':
+                for client in clients:
+                    client.close()
+                print("Client bağlantıları kapatıldı.")
+                break
+            else:
+                try:
+                    client_index = int(user_input)
+                    if 0 <= client_index < len(clients):
+                        x = input("Enter the message type as int 1 = ACK; 2 = NACK; 3 = BYE; 4 = INFO ")
+                        try:
+                            input_str = int(x)
+                            corr = False
+                            while not corr:
+                                if corr <= 4:
+                                    final_type = input_str
+                                    corr = True
+                        except:
+                            print("The input is not an integer")
+                        message = input("Göndermek istediğiniz mesajı girin: ")
+                        packet = Packet(SERVER_ID, MessageType(final_type), message)
+                        send_message_to_client(clients[client_index], packet)
+                    else:
+                        print("Geçersiz client indeksi!")
+                except ValueError:
+                    print("Lütfen geçerli bir sayı girin.")
+
+
+def show_clients():
+    print("\nBağlı clientlar:")
+    for index, client in enumerate(clients):
+        # Clientin IP adresi ve portunu göster
+        print(f"{index}: {client.getpeername()}")
+
+
+if __name__ == '__main__':
+    # Server'i başlat ve gelen client isteklerini kabul et
+    threading.Thread(target=run_server, args=(HOST, PORT)).start()
+
+    # Kullanicidan alinacak inputlari dinle
+    get_input_thread = threading.Thread(target=input_handler(), args=()).start()
