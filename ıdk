@@ -7,8 +7,8 @@ PORT = 5555
 MAX_BYTE = 1024
 SERVER_ID = 1
 Train_move = False
-def run(host, port):
 
+def run(host, port):
     try:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind((host, port))
@@ -20,55 +20,59 @@ def run(host, port):
     while True:
         try:
             client_socket, addr = server.accept()
-            print(1)
+            print("Client connected:", addr)
             client_thread = threading.Thread(target=client_handler, args=(client_socket,))
-            print(2)
             client_thread.start()
-            print(3)
-        except Exception as  e:
+        except Exception as e:
             print(f"Error {e}")
-
 
 
 def send_message_to_client(client_socket, message):
     try:
         client_socket.send(message)
     except Exception as e:
-        print(f"Mesaj gönderilemedi. {e}")
+        print(f"Message could not be sent. {e}")
+
 
 def client_handler(client_socket):
-    while True:
-        try:
+    global Train_move
+    try:
+        while True:
             message = client_socket.recv(MAX_BYTE)
-            print(1.1)
-            de_message = message.decode()
-            print(de_message)
-            if MessageType(de_message) == 1:
+            if not message:
+                print("Client disconnected.")
+                break  # Exit the loop if client disconnects
+
+            de_message = message.decode().strip()
+            print(f"Received message: {de_message}")
+
+            if MessageType[de_message] == MessageType.move:
                 Train_move = True
             else:
                 Train_move = False
-            if message:
-                print(MessageType(de_message))
-        except:
-            print("Error")
 
+            if message:
+                print(f"Train move status: {Train_move}")
+    except Exception as e:
+        print(f"Error: {e}")
+    finally:
+        client_socket.close()  # Ensure socket is closed when done
 
 
 def input(condition):
     while True:
-        #Condition will be implamenteed later
+        # Condition will be implemented later
         pass
-
-
 
 
 class MessageType(Enum):
     move = 1
     stop = 2
 
+
 def main():
     threading.Thread(target=run, args=(HOST, PORT)).start()
 
 
-
-
+if __name__ == "__main__":
+    main()
