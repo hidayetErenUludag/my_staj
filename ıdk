@@ -1,14 +1,24 @@
+import sys
 import socket
 import threading
 from enum import Enum
+from time import sleep
+from PyQt5 import QtWidgets, QtCore
 
+
+# Server Variables
 HOST = "127.0.0.1"
 PORT = 5555
 MAX_BYTE = 1024
 SERVER_ID = 1
 Train_move = False
 
-def run(host, port):
+# Client Variables
+CLIENT_ID = 2
+
+
+# Server Code
+def run_server(host, port):
     try:
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         server.bind((host, port))
@@ -24,14 +34,7 @@ def run(host, port):
             client_thread = threading.Thread(target=client_handler, args=(client_socket,))
             client_thread.start()
         except Exception as e:
-            print(f"Error {e}")
-
-
-def send_message_to_client(client_socket, message):
-    try:
-        client_socket.send(message)
-    except Exception as e:
-        print(f"Message could not be sent. {e}")
+            print(f"Error: {e}")
 
 
 def client_handler(client_socket):
@@ -59,38 +62,56 @@ def client_handler(client_socket):
         client_socket.close()  # Ensure socket is closed when done
 
 
-def input(condition):
+# Client Code
+def client_send_message(data):
+    try:
+        client_socket.send(data.encode())
+    except Exception as e:
+        print(f"Error: {e}")
+
+
+def start_client(host, port):
+    global client_socket
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((host, port))
+    print("Connected to server")
+
+    try:
+        user_input = int(input("Please enter 1 to start or 2 to stop: "))
+        message = MessageType(user_input).name
+    except:
+        print("Please enter a valid number")
+
+    receive_thread = threading.Thread(target=listener, args=(client_socket,))
+    receive_thread.start()
+    client_send_message(message)
+
+
+def listener(client_socket):
     while True:
-        # Condition will be implemented later
-        pass
+        try:
+            data = client_socket.recv(MAX_BYTE)
+            if data:
+                print(MessageType(data.decode()))
+            else:
+                break
+        except:
+            print("\nConnection lost.")
+            break
 
 
+# Enum Class for Message Types
 class MessageType(Enum):
     move = 1
     stop = 2
 
 
-def main():
-    threading.Thread(target=run, args=(HOST, PORT)).start()
-
-
-if __name__ == "__main__":
-    main()
-
-
-import sys
-from time import sleep
-
-from PyQt5 import QtWidgets, QtCore
-import trainggui
-train_move = trainggui.Train_move
-
-class mainwindows(QtWidgets.QMainWindow):
+# GUI Code
+class MainWindows(QtWidgets.QMainWindow):
     def __init__(self):
-        super(mainwindows, self).__init__()
+        super(MainWindows, self).__init__()
         self.buildWidgets()
-        trainggui.main()
-
+        self.startServer()
 
     def buildWidgets(self):
         self.buildMainWidget()
@@ -100,13 +121,12 @@ class mainwindows(QtWidgets.QMainWindow):
 
     def buildSignals(self):
         self.btn_tren14.raise_()
-        if  train_move:
+        if Train_move:
             self.doAnimation()
 
-
-    def move_train(self, int):
+    def move_train(self, x):
         sleep(0.1)
-        self.btn_tren14.move(int, 40)
+        self.btn_tren14.move(x, 40)
 
     def doAnimation(self):
         self.enemyAnimation = QtCore.QSequentialAnimationGroup()
@@ -122,7 +142,6 @@ class mainwindows(QtWidgets.QMainWindow):
         self.enemyAnimation.addAnimation(self.second)
         self.enemyAnimation.start()
 
-    # ------------------------- Design Area -------------------------
     def buildMainWidget(self):
         self.resize(800, 610)
         self.centralwidget = QtWidgets.QWidget(self)
@@ -164,68 +183,15 @@ class mainwindows(QtWidgets.QMainWindow):
         self.statusbar = QtWidgets.QStatusBar(self)
         self.setStatusBar(self.statusbar)
 
-app = QtWidgets.QApplication(sys.argv)
-windows = mainwindows()
-windows.show()
-sys.exit(app.exec_())
+    def startServer(self):
+        threading.Thread(target=run_server, args=(HOST, PORT)).start()
 
 
-import socket
-import threading
-import time
-from enum import Enum
-from turtledemo.clock import datum
-from xml.sax.saxutils import escape
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    windows = MainWindows()
+    windows.show()
+    sys.exit(app.exec_())
 
-from httpcore import SOCKET_OPTION
-
-HOST = "127.0.0.1"
-PORT = 5555
-CLIENT_ID = 2
-MAX_BYTE = 1024
-
-client_socket = None
-
-
-def send_message(Data):
-    try:
-        client_socket.send(Data.to_bytes())
-    except Exception as  e:
-        print(f"Hata {e}")
-
-
-def server(host,port):
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((host, port))
-    print("Connected")
-    try:
-        user_input = int(input("Plese enter 1 for start 2 for stop"))
-        message = MessageType(user_input)
-    except:
-        print("PLese enter a number")
-    receive_thread = threading.Thread(target=listener(client_socket), args=(client_socket,))
-    receive_thread.start()
-    send_message(user_input)
-
-
-def listener(client_socket):
-    while True:
-        try:
-            data = client_socket.recv(MAX_BYTE)
-            if data:
-                print(MessageType(data.decode()))
-            else:
-                break
-        except:
-            print("\nBağlantı koptu.")
-            break
-
-
-class MessageType(Enum):
-    move = 1
-    stop = 2
-
-
-
-server(HOST,PORT)
-
+    # Start client to send/receive messages
+    start_client(HOST, PORT)
