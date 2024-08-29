@@ -1,120 +1,49 @@
 import socket
-import threading
 from enum import Enum
 
 HOST = "127.0.0.1"
 PORT = 5555
 MAX_BYTE = 1024
-Train_move = False
 
 class MessageType(Enum):
     move = 1
     stop = 2
 
-def run_server(host, port):
+def send_message(data):
     try:
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.bind((host, port))
-        server.listen(5)
-        print("Server started, waiting for connections...")
-    except Exception as e:
-        print(f"Error starting server: {e}")
-        return
-
-    while True:
-        try:
-            client_socket, addr = server.accept()
-            print(f"Client connected: {addr}")
-            client_thread = threading.Thread(target=client_handler, args=(client_socket,))
-            client_thread.start()
-        except Exception as e:
-            print(f"Error: {e}")
-
-def client_handler(client_socket):
-    global Train_move
-    try:
-        while True:
-            message = client_socket.recv(MAX_BYTE)
-            if not message:
-                print("Client disconnected.")
-                break
-
-            de_message = message.decode().strip()
-            print(f"Received message: {de_message}")
-
-            if MessageType[de_message] == MessageType.move:
-                Train_move = True
-            else:
-                Train_move = False
-
-            print(f"Train move status: {Train_move}")
-    except Exception as e:
-        print(f"Error in client handler: {e}")
-    finally:
+        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        client_socket.connect((HOST, PORT))
+        client_socket.send(data.encode())
         client_socket.close()
+    except Exception as e:
+        print(f"Error: {e}")
 
 if __name__ == "__main__":
-    run_server(HOST, PORT)
-
-
-
-import socket
-import threading
-from enum import Enum
-
-HOST = "127.0.0.1"
-PORT = 5555
-MAX_BYTE = 1024
-
-class MessageType(Enum):
-    move = 1
-    stop = 2
-
-client_socket = None
-
-def client_send_message(data):
     try:
-        client_socket.send(data.encode())
-    except Exception as e:
-        print(f"Error sending message: {e}")
-
-def start_client(host, port):
-    global client_socket
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    client_socket.connect((host, port))
-    print("Connected to server")
-
-    try:
-        user_input = int(input("Please enter 1 to start or 2 to stop: "))
+        user_input = int(input("Please enter 1 to start the train or 2 to stop it: "))
         message = MessageType(user_input).name
-        client_send_message(message)
+        send_message(message)
     except Exception as e:
         print(f"Input error: {e}")
 
-    receive_thread = threading.Thread(target=listener, args=(client_socket,))
-    receive_thread.start()
 
-def listener(client_socket):
-    while True:
-        try:
-            data = client_socket.recv(MAX_BYTE)
-            if data:
-                print(f"Received from server: {data.decode()}")
-            else:
-                break
-        except:
-            print("Connection lost.")
-            break
 
-if __name__ == "__main__":
-    start_client(HOST, PORT)
 
 
 
 import sys
+import socket
 import threading
+from enum import Enum
 from PyQt5 import QtWidgets, QtCore
-from server import run_server, Train_move
+
+HOST = "127.0.0.1"
+PORT = 5555
+MAX_BYTE = 1024
+
+class MessageType(Enum):
+    move = 1
+    stop = 2
 
 class MainWindows(QtWidgets.QMainWindow):
     def __init__(self):
@@ -123,34 +52,6 @@ class MainWindows(QtWidgets.QMainWindow):
         self.startServer()
 
     def buildWidgets(self):
-        self.buildMainWidget()
-        self.buildMenubar()
-        self.buildStatusbar()
-        self.buildSignals()
-
-    def buildSignals(self):
-        self.btn_tren14.raise_()
-        if Train_move:
-            self.doAnimation()
-
-    def move_train(self, x):
-        QtCore.QTimer.singleShot(100, lambda: self.btn_tren14.move(x, 40))
-
-    def doAnimation(self):
-        self.enemyAnimation = QtCore.QSequentialAnimationGroup()
-        self.first = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
-        self.first.setDuration(5000)
-        self.first.setStartValue(QtCore.QPoint(50, 35))
-        self.first.setEndValue(QtCore.QPoint(650, 35))
-        self.second = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
-        self.second.setDuration(5000)
-        self.second.setStartValue(QtCore.QPoint(650, 140))
-        self.second.setEndValue(QtCore.QPoint(50, 140))
-        self.enemyAnimation.addAnimation(self.first)
-        self.enemyAnimation.addAnimation(self.second)
-        self.enemyAnimation.start()
-
-    def buildMainWidget(self):
         self.resize(800, 610)
         self.centralwidget = QtWidgets.QWidget(self)
         self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
@@ -182,17 +83,59 @@ class MainWindows(QtWidgets.QMainWindow):
         self.gridLayout.addLayout(self.verticalLayout_2, 1, 0, 1, 1)
         self.setCentralWidget(self.centralwidget)
 
-    def buildMenubar(self):
-        self.menubar = QtWidgets.QMenuBar(self)
-        self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 18))
-        self.setMenuBar(self.menubar)
-
-    def buildStatusbar(self):
-        self.statusbar = QtWidgets.QStatusBar(self)
-        self.setStatusBar(self.statusbar)
-
     def startServer(self):
-        threading.Thread(target=run_server, args=("127.0.0.1", 5555)).start()
+        server_thread = threading.Thread(target=self.runServer)
+        server_thread.daemon = True
+        server_thread.start()
+
+    def runServer(self):
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind((HOST, PORT))
+        server.listen(5)
+        print("Server started, waiting for connections...")
+
+        while True:
+            client_socket, addr = server.accept()
+            client_thread = threading.Thread(target=self.clientHandler, args=(client_socket,))
+            client_thread.start()
+
+    def clientHandler(self, client_socket):
+        try:
+            while True:
+                message = client_socket.recv(MAX_BYTE)
+                if not message:
+                    break
+
+                de_message = message.decode().strip()
+                print(f"Received message: {de_message}")
+
+                if MessageType[de_message] == MessageType.move:
+                    self.doAnimation()
+                elif MessageType[de_message] == MessageType.stop:
+                    self.stopAnimation()
+
+        except Exception as e:
+            print(f"Error in client handler: {e}")
+        finally:
+            client_socket.close()
+
+    def doAnimation(self):
+        self.enemyAnimation = QtCore.QSequentialAnimationGroup()
+        self.first = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
+        self.first.setDuration(5000)
+        self.first.setStartValue(QtCore.QPoint(50, 35))
+        self.first.setEndValue(QtCore.QPoint(650, 35))
+        self.second = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
+        self.second.setDuration(5000)
+        self.second.setStartValue(QtCore.QPoint(650, 140))
+        self.second.setEndValue(QtCore.QPoint(50, 140))
+        self.enemyAnimation.addAnimation(self.first)
+        self.enemyAnimation.addAnimation(self.second)
+        self.enemyAnimation.start()
+
+    def stopAnimation(self):
+        if hasattr(self, 'enemyAnimation'):
+            self.enemyAnimation.stop()
 
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
