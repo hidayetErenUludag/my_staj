@@ -43,7 +43,7 @@ def client_handler(client_socket):
                 print("Client disconnected.")
                 break  # Exit the loop if client disconnects
 
-            de_message = message.decode().strip()
+            de_message = message.decode()
             print(f"Received message: {de_message}")
 
             if MessageType[de_message] == MessageType.move:
@@ -76,3 +76,156 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+import sys
+from time import sleep
+
+from PyQt5 import QtWidgets, QtCore
+import trainggui
+train_move = trainggui.Train_move
+
+class mainwindows(QtWidgets.QMainWindow):
+    def __init__(self):
+        super(mainwindows, self).__init__()
+        self.buildWidgets()
+        trainggui.main()
+
+
+    def buildWidgets(self):
+        self.buildMainWidget()
+        self.buildMenubar()
+        self.buildStatusbar()
+        self.buildSignals()
+
+    def buildSignals(self):
+        self.btn_tren14.raise_()
+        if  train_move:
+            self.doAnimation()
+
+
+    def move_train(self, int):
+        sleep(0.1)
+        self.btn_tren14.move(int, 40)
+
+    def doAnimation(self):
+        self.enemyAnimation = QtCore.QSequentialAnimationGroup()
+        self.first = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
+        self.first.setDuration(5000)
+        self.first.setStartValue(QtCore.QPoint(50, 35))
+        self.first.setEndValue(QtCore.QPoint(650, 35))
+        self.second = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
+        self.second.setDuration(5000)
+        self.second.setStartValue(QtCore.QPoint(650, 140))
+        self.second.setEndValue(QtCore.QPoint(50, 140))
+        self.enemyAnimation.addAnimation(self.first)
+        self.enemyAnimation.addAnimation(self.second)
+        self.enemyAnimation.start()
+
+    # ------------------------- Design Area -------------------------
+    def buildMainWidget(self):
+        self.resize(800, 610)
+        self.centralwidget = QtWidgets.QWidget(self)
+        self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
+        self.verticalLayout = QtWidgets.QVBoxLayout()
+        self.widget = QtWidgets.QWidget(self.centralwidget)
+        self.widget.setMinimumSize(QtCore.QSize(0, 500))
+        self.widget.setMaximumSize(QtCore.QSize(16777215, 500))
+        self.widget.setStyleSheet("background-color: rgb(0, 0, 0);")
+        self.line = QtWidgets.QFrame(self.widget)
+        self.line.setGeometry(QtCore.QRect(50, 53, 661, 20))
+        self.line.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.line.setFrameShape(QtWidgets.QFrame.HLine)
+        self.line.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.btn_tren14 = QtWidgets.QPushButton(self.widget)
+        self.btn_tren14.setGeometry(QtCore.QRect(50, 35, 61, 61))
+        self.btn_tren14.setStyleSheet("background-color: rgb(85, 255, 127);")
+        self.btn_tren14.setText("14")
+        self.line_2 = QtWidgets.QFrame(self.widget)
+        self.line_2.setGeometry(QtCore.QRect(50, 160, 661, 20))
+        self.line_2.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.line_2.setFrameShape(QtWidgets.QFrame.HLine)
+        self.line_2.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.verticalLayout.addWidget(self.widget)
+        self.gridLayout.addLayout(self.verticalLayout, 0, 0, 1, 1)
+        self.verticalLayout_2 = QtWidgets.QVBoxLayout()
+        self.textEdit = QtWidgets.QTextEdit(self.centralwidget)
+        self.textEdit.setMaximumSize(QtCore.QSize(16777215, 300))
+        self.verticalLayout_2.addWidget(self.textEdit)
+        self.gridLayout.addLayout(self.verticalLayout_2, 1, 0, 1, 1)
+        self.setCentralWidget(self.centralwidget)
+
+    def buildMenubar(self):
+        self.menubar = QtWidgets.QMenuBar(self)
+        self.menubar.setGeometry(QtCore.QRect(0, 0, 800, 18))
+        self.setMenuBar(self.menubar)
+
+    def buildStatusbar(self):
+        self.statusbar = QtWidgets.QStatusBar(self)
+        self.setStatusBar(self.statusbar)
+
+app = QtWidgets.QApplication(sys.argv)
+windows = mainwindows()
+windows.show()
+sys.exit(app.exec_())
+
+
+import socket
+import threading
+import time
+from enum import Enum
+from turtledemo.clock import datum
+from xml.sax.saxutils import escape
+
+from httpcore import SOCKET_OPTION
+
+HOST = "127.0.0.1"
+PORT = 5555
+CLIENT_ID = 2
+MAX_BYTE = 1024
+
+client_socket = None
+
+
+def send_message(Data):
+    try:
+        client_socket.send(Data.to_bytes())
+    except Exception as  e:
+        print(f"Hata {e}")
+
+
+def server(host,port):
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    client_socket.connect((host, port))
+    print("Connected")
+    try:
+        user_input = int(input("Plese enter 1 for start 2 for stop"))
+        message = MessageType(user_input)
+    except:
+        print("PLese enter a number")
+    receive_thread = threading.Thread(target=listener(client_socket), args=(client_socket,))
+    receive_thread.start()
+    send_message(user_input)
+
+
+def listener(client_socket):
+    while True:
+        try:
+            data = client_socket.recv(MAX_BYTE)
+            if data:
+                print(MessageType(data.decode()))
+            else:
+                break
+        except:
+            print("\nBağlantı koptu.")
+            break
+
+
+class MessageType(Enum):
+    move = 1
+    stop = 2
+
+
+
+server(HOST,PORT)
+
