@@ -1,144 +1,32 @@
-import socket
-from enum import Enum
+# Diagonal line 1 (top-left to bottom-right)
+        self.diagonal_1 = QtWidgets.QFrame(self.widget)
+        self.diagonal_1.setGeometry(QtCore.QRect(50, 60, 661, 100))
+        self.diagonal_1.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.diagonal_1.setFrameShape(QtWidgets.QFrame.HLine)
+        self.diagonal_1.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.diagonal_1.setLineWidth(2)
+        self.diagonal_1.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.diagonal_1.setFrameShape(QtWidgets.QFrame.VLine)
+        self.diagonal_1.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.diagonal_1.setGeometry(QtCore.QRect(345, 53, 20, 110))
+        self.diagonal_1.setStyleSheet("border: 2px solid white;")
+        self.diagonal_1.setFrameShape(QtWidgets.QFrame.HLine)
+        self.diagonal_1.setLineWidth(2)
+        self.diagonal_1.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
 
-HOST = "127.0.0.1"
-PORT = 5555
-MAX_BYTE = 1024
-
-class MessageType(Enum):
-    move = 1
-    stop = 2
-
-def send_message(data):
-    try:
-        client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        client_socket.connect((HOST, PORT))
-        client_socket.send(data.encode())
-        client_socket.close()
-    except Exception as e:
-        print(f"Error: {e}")
-
-if __name__ == "__main__":
-    try:
-        user_input = int(input("Please enter 1 to start the train or 2 to stop it: "))
-        message = MessageType(user_input).name
-        send_message(message)
-    except Exception as e:
-        print(f"Input error: {e}")
-
-
-
-
-
-
-import sys
-import socket
-import threading
-from enum import Enum
-from PyQt5 import QtWidgets, QtCore
-
-HOST = "127.0.0.1"
-PORT = 5555
-MAX_BYTE = 1024
-
-class MessageType(Enum):
-    move = 1
-    stop = 2
-
-class MainWindows(QtWidgets.QMainWindow):
-    def __init__(self):
-        super(MainWindows, self).__init__()
-        self.buildWidgets()
-        self.startServer()
-
-    def buildWidgets(self):
-        self.resize(800, 610)
-        self.centralwidget = QtWidgets.QWidget(self)
-        self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
-        self.verticalLayout = QtWidgets.QVBoxLayout()
-        self.widget = QtWidgets.QWidget(self.centralwidget)
-        self.widget.setMinimumSize(QtCore.QSize(0, 500))
-        self.widget.setMaximumSize(QtCore.QSize(16777215, 500))
-        self.widget.setStyleSheet("background-color: rgb(0, 0, 0);")
-        self.line = QtWidgets.QFrame(self.widget)
-        self.line.setGeometry(QtCore.QRect(50, 53, 661, 20))
-        self.line.setStyleSheet("background-color: rgb(255, 255, 255);")
-        self.line.setFrameShape(QtWidgets.QFrame.HLine)
-        self.line.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.btn_tren14 = QtWidgets.QPushButton(self.widget)
-        self.btn_tren14.setGeometry(QtCore.QRect(50, 35, 61, 61))
-        self.btn_tren14.setStyleSheet("background-color: rgb(85, 255, 127);")
-        self.btn_tren14.setText("14")
-        self.line_2 = QtWidgets.QFrame(self.widget)
-        self.line_2.setGeometry(QtCore.QRect(50, 160, 661, 20))
-        self.line_2.setStyleSheet("background-color: rgb(255, 255, 255);")
-        self.line_2.setFrameShape(QtWidgets.QFrame.HLine)
-        self.line_2.setFrameShadow(QtWidgets.QFrame.Sunken)
-        self.verticalLayout.addWidget(self.widget)
-        self.gridLayout.addLayout(self.verticalLayout, 0, 0, 1, 1)
-        self.verticalLayout_2 = QtWidgets.QVBoxLayout()
-        self.textEdit = QtWidgets.QTextEdit(self.centralwidget)
-        self.textEdit.setMaximumSize(QtCore.QSize(16777215, 300))
-        self.verticalLayout_2.addWidget(self.textEdit)
-        self.gridLayout.addLayout(self.verticalLayout_2, 1, 0, 1, 1)
-        self.setCentralWidget(self.centralwidget)
-
-    def startServer(self):
-        server_thread = threading.Thread(target=self.runServer)
-        server_thread.daemon = True
-        server_thread.start()
-
-    def runServer(self):
-        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        server.bind((HOST, PORT))
-        server.listen(5)
-        print("Server started, waiting for connections...")
-
-        while True:
-            client_socket, addr = server.accept()
-            client_thread = threading.Thread(target=self.clientHandler, args=(client_socket,))
-            client_thread.start()
-
-    def clientHandler(self, client_socket):
-        try:
-            while True:
-                message = client_socket.recv(MAX_BYTE)
-                if not message:
-                    break
-
-                de_message = message.decode().strip()
-                print(f"Received message: {de_message}")
-
-                if MessageType[de_message] == MessageType.move:
-                    self.doAnimation()
-                elif MessageType[de_message] == MessageType.stop:
-                    self.stopAnimation()
-
-        except Exception as e:
-            print(f"Error in client handler: {e}")
-        finally:
-            client_socket.close()
-
-    def doAnimation(self):
-        self.enemyAnimation = QtCore.QSequentialAnimationGroup()
-        self.first = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
-        self.first.setDuration(5000)
-        self.first.setStartValue(QtCore.QPoint(50, 35))
-        self.first.setEndValue(QtCore.QPoint(650, 35))
-        self.second = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
-        self.second.setDuration(5000)
-        self.second.setStartValue(QtCore.QPoint(650, 140))
-        self.second.setEndValue(QtCore.QPoint(50, 140))
-        self.enemyAnimation.addAnimation(self.first)
-        self.enemyAnimation.addAnimation(self.second)
-        self.enemyAnimation.start()
-
-    def stopAnimation(self):
-        if hasattr(self, 'enemyAnimation'):
-            self.enemyAnimation.stop()
-
-if __name__ == "__main__":
-    app = QtWidgets.QApplication(sys.argv)
-    windows = MainWindows()
-    windows.show()
-    sys.exit(app.exec_())
+        # Diagonal line 2 (top-right to bottom-left)
+        self.diagonal_2 = QtWidgets.QFrame(self.widget)
+        self.diagonal_2.setGeometry(QtCore.QRect(50, 60, 661, 100))
+        self.diagonal_2.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.diagonal_2.setFrameShape(QtWidgets.QFrame.HLine)
+        self.diagonal_2.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.diagonal_2.setLineWidth(2)
+        self.diagonal_2.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.diagonal_2.setFrameShape(QtWidgets.QFrame.VLine)
+        self.diagonal_2.setFrameShadow(QtWidgets.QFrame.Sunken)
+        self.diagonal_2.setGeometry(QtCore.QRect(345, 53, 20, 110))
+        self.diagonal_2.setStyleSheet("border: 2px solid white;")
+        self.diagonal_2.setFrameShape(QtWidgets.QFrame.HLine)
+        self.diagonal_2.setLineWidth(2)
+        self.diagonal_2.setSizePolicy(QtWidgets.QSizePolicy.Fixed, QtWidgets.QSizePolicy.Fixed)
+        self.diagonal_2.setRotation(45)
