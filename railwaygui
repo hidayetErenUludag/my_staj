@@ -1,0 +1,335 @@
+import socket
+import sys
+import threading
+from time import sleep
+from graphtest import find_shortest
+from PyQt5 import QtWidgets, QtCore, QtGui
+from PyQt5.QtCore import pyqtSlot
+from pyexpat.errors import messages
+
+HOST = "127.0.0.1"
+PORT = 5555
+MAX_BYTE = 1024
+
+LINE_LEFT = 50
+LINE_RIGHT = 711
+
+LINE_1_Y = 29
+LINE_2_Y = 161
+LINE_3_Y = 244
+LINE_4_Y = 376
+
+LINE_1_DOWN = 69
+LINE_3_DOWN = 284
+
+LINE_WIDTH = 661
+LINE_HEIGHT = 40
+BETWEEN_LINES = 92
+HALFOF_BETWWEN_LINES = 42
+TRAIN_WIDTH = 40
+TRAIN_HEIGHT = 40
+
+X_1 = 80
+X_2 = 180
+X_3 = 525
+X_4 = 635
+
+TRAIN_X = 671 #50+661-40
+#TRAIN_X = 661
+TRAIN_Y = 376
+current_station = "L11M"
+go_to = None
+
+
+class rotates:
+    def __init__(self, rotateName, x_position, y_position):
+        self.rotateName = rotateName
+        self.x_position = x_position
+        self.y_position = y_position
+
+class client(QtCore.QObject):
+    message_received = QtCore.pyqtSignal(str)
+    def __init__(self):
+        super().__init__()
+        self.client_socket = None
+
+    def receive_messages(self):
+        while True:
+            try:
+                message = self.client_socket.recv(MAX_BYTE).decode('utf-8')
+                if message:
+                    self.message_received.emit(message)
+                    print(message)
+                else:
+                    print("EMPTY MESSAGE")
+            except Exception as e:
+                print(f"\nBağlantı koptu: {e}")
+                break
+
+
+    def start_client(self, host, port):
+        while True:
+            try:
+                self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+                self.client_socket.connect((host, port))
+                print("CONNECTED SUCCESSFULLY!")
+                receive_thread = threading.Thread(target=self.receive_messages)
+                receive_thread.start()
+                break
+            except Exception as e:
+                print(f"Bağlantı hatası: {e}. Yeniden deniyorum...")
+                sleep(5)
+
+
+class MainWindows(QtWidgets.QMainWindow):
+    def __init__(self):
+        super(MainWindows, self).__init__()
+        self.rotateList = {}
+        self.buildRotates()
+        self.client = client()
+        self.client.message_received.connect(self.message_decode)
+        self.startServer()
+        self.enemyAnimation = None
+        self.buildMainWidget()
+
+
+    def buildRotates(self):
+        self.rotateList["L11M"] = rotates("L11M", X_1, LINE_1_Y)
+        self.rotateList["L12M"] = rotates("L12M", X_2, LINE_1_Y)
+        self.rotateList["L13M"] = rotates("L13M", X_3, LINE_1_Y)
+        self.rotateList["L14M"] = rotates("L14M", X_4, LINE_1_Y)
+        self.rotateList["L15M"] = rotates("L15M", X_1, LINE_3_Y)
+        self.rotateList["L16M"] = rotates("L16M", X_2, LINE_3_Y)
+        self.rotateList["L17M"] = rotates("L17M", X_3, LINE_3_Y)
+        self.rotateList["L18M"] = rotates("L18M", X_4, LINE_3_Y)
+        self.rotateList["L21M"] = rotates("L21M", X_4, LINE_4_Y)
+        self.rotateList["L22M"] = rotates("L22M", X_3, LINE_4_Y)
+        self.rotateList["L23M"] = rotates("L23M", X_2, LINE_4_Y)
+        self.rotateList["L24M"] = rotates("L24M", X_1, LINE_4_Y)
+        self.rotateList["L25M"] = rotates("L25M", X_4, LINE_2_Y)
+        self.rotateList["L26M"] = rotates("L26M", X_3, LINE_2_Y)
+        self.rotateList["L27M"] = rotates("L27M", X_2, LINE_2_Y)
+        self.rotateList["L28M"] = rotates("L28M", X_1, LINE_2_Y)
+
+
+    def startServer(self):
+        server_thread = threading.Thread(target=self.runServer)
+        server_thread.daemon = True
+        server_thread.start()
+
+
+    def runServer(self):
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind((HOST, PORT))
+        server.listen(5)
+        print("Server started, waiting for connections...")
+        while True:
+            client_socket, addr = server.accept()
+            client_thread = threading.Thread(target=self.clientHandler, args=(client_socket,))
+            client_thread.start()
+
+
+    def message_decode(self, station):
+        try:
+            station = self.rotateList[station]
+            print(f"Target station is {station.rotateName}")
+            self.doAnimation(station.x_position, station.y_position)
+        except:
+            print("The station is not on the list")
+
+
+    @pyqtSlot()
+    def doAnimation(self, x, y):
+        current_x = self.btn_tren14.x()
+        current_y = self.btn_tren14.y()
+        if current_y == y:
+            self.addAnimation(current_x, current_y, x, y)
+            speed = (x-current_x) * 50
+
+
+
+    @pyqtSlot()
+    def stopAnimation(self):
+        self.activateWindow()
+        self.enemyAnimation.pause()
+
+    def loop1(self, x, y):
+        try:
+            current_x = self.btn_tren14.x()
+            current_y = self.btn_tren14.y()
+            animation = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
+            speed = (x - current_x) * 5
+            animation.setDuration(1000)
+            animation.setStartValue(QtCore.QPoint(current_x, current_y))
+            animation.setEndValue(QtCore.QPoint(x, y))
+            self.enemyAnimation.addAnimation(animation)
+        except Exception as e:
+            print(f"Error: {e}")
+
+
+
+    def addAnimation(self, current_x, current_y, target_x, target_y):
+        try:
+            animation = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
+            speed = (target_x - current_x) * 50
+            animation.setDuration(speed)
+            animation.setStartValue(QtCore.QPoint(current_x, current_y))
+            animation.setEndValue(QtCore.QPoint(target_x, target_y))
+            self.enemyAnimation.addAnimation(animation)
+        except Exception as e:
+            print(f"Error: {e}")
+
+
+#--------------------------------------------------Design--------------------------------------------------------
+    def buildMainWidget(self):
+        self.resize(800, 610)
+        self.centralwidget = QtWidgets.QWidget(self)
+        self.gridLayout = QtWidgets.QGridLayout(self.centralwidget)
+        self.verticalLayout = QtWidgets.QVBoxLayout()
+
+        self.widget = QtWidgets.QWidget(self.centralwidget)
+        self.widget.setMinimumSize(QtCore.QSize(0, 500))
+        self.widget.setMaximumSize(QtCore.QSize(16777215, 500))
+        self.widget.setStyleSheet("background-color: rgb(0, 0, 0);")
+
+        self.line = QtWidgets.QFrame(self.widget)
+        self.line.setGeometry(QtCore.QRect(50, 53, 661, 20))
+        self.line.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.line.setFrameShape(QtWidgets.QFrame.HLine)
+        self.line.setFrameShadow(QtWidgets.QFrame.Sunken)
+
+        self.btn_tren14 = QtWidgets.QPushButton(self.widget)
+        self.btn_tren14.setGeometry(QtCore.QRect(40, 40, 60, 40))
+        self.btn_tren14.setStyleSheet("background-color: rgb(85, 255, 127);")
+        self.btn_tren14.setText("14")
+        self.btn_tren14.raise_()
+
+        self.line_2 = QtWidgets.QFrame(self.widget)
+        self.line_2.setGeometry(QtCore.QRect(50, 160, 661, 20))
+        self.line_2.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.line_2.setFrameShape(QtWidgets.QFrame.HLine)
+        self.line_2.setFrameShadow(QtWidgets.QFrame.Sunken)
+
+        self.createScissors()
+        self.createStops()
+        self.verticalLayout.addWidget(self.widget)
+        self.gridLayout.addLayout(self.verticalLayout, 0, 0, 1, 1)
+        self.verticalLayout_2 = QtWidgets.QVBoxLayout()
+        self.gridLayout.addLayout(self.verticalLayout_2, 1, 0, 1, 1)
+        self.setCentralWidget(self.centralwidget)
+
+        self.line3 = QtWidgets.QFrame(self.widget)
+        self.line3.setGeometry(QtCore.QRect(50, 300, 661, 20))
+        self.line3.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.line3.setFrameShape(QtWidgets.QFrame.HLine)
+        self.line3.setFrameShadow(QtWidgets.QFrame.Sunken)
+
+        self.line4 = QtWidgets.QFrame(self.widget)
+        self.line4.setGeometry(QtCore.QRect(50, 407, 661, 20))
+        self.line4.setStyleSheet("background-color: rgb(255, 255, 255);")
+        self.line4.setFrameShape(QtWidgets.QFrame.HLine)
+        self.line4.setFrameShadow(QtWidgets.QFrame.Sunken)
+
+
+    def createStops(self):
+        self.L11M = QtWidgets.QPushButton(self.widget)
+        self.L11M.setGeometry(QtCore.QRect(80, 70, 50, 40))
+        self.L11M.setStyleSheet("background-color: rgb(0, 71, 171);")
+        self.L11M.setText("L11M")
+        self.L11M.raise_()
+
+        self.L12M = QtWidgets.QPushButton(self.widget)
+        self.L12M.setGeometry(QtCore.QRect(180, 70, 50, 40))
+        self.L12M.setStyleSheet("background-color: rgb(0, 71, 171);")
+        self.L12M.setText("L12M")
+        self.L12M.raise_()
+
+        self.L13M = QtWidgets.QPushButton(self.widget)
+        self.L13M.setGeometry(QtCore.QRect(80, 120, 50, 40))
+        self.L13M.setStyleSheet("background-color: rgb(0, 71, 171);")
+        self.L13M.setText("L13M")
+        self.L13M.raise_()
+
+        self.L14M = QtWidgets.QPushButton(self.widget)
+        self.L14M.setGeometry(QtCore.QRect(180, 120, 50, 40))
+        self.L14M.setStyleSheet("background-color: rgb(0, 71, 171);")
+        self.L14M.setText("L14M")
+        self.L14M.raise_()
+
+        self.L15M = QtWidgets.QPushButton(self.widget)
+        self.L15M.setGeometry(QtCore.QRect(525, 70, 50, 40))
+        self.L15M.setStyleSheet("background-color: rgb(0, 71, 171);")
+        self.L15M.setText("L15M")
+        self.L15M.raise_()
+
+        self.L16M = QtWidgets.QPushButton(self.widget)
+        self.L16M.setGeometry(QtCore.QRect(635, 70, 50, 40))
+        self.L16M.setStyleSheet("background-color: rgb(0, 71, 171);")
+        self.L16M.setText("L16M")
+        self.L16M.raise_()
+
+        self.L17M = QtWidgets.QPushButton(self.widget)
+        self.L17M.setGeometry(QtCore.QRect(525, 120, 50, 40))
+        self.L17M.setStyleSheet("background-color: rgb(0, 71, 171);")
+        self.L17M.setText("L17M")
+        self.L17M.raise_()
+
+        self.L18M = QtWidgets.QPushButton(self.widget)
+        self.L18M.setGeometry(QtCore.QRect(635, 120, 50, 40))
+        self.L18M.setStyleSheet("background-color: rgb(0, 71, 171);")
+        self.L18M.setText("L18M")
+        self.L18M.raise_()
+
+
+    def createScissors(self):
+        self.graphicsView = QtWidgets.QGraphicsView(self.widget)
+        self.graphicsView.setGeometry(QtCore.QRect(50,70,661,90))
+
+        self.scene = QtWidgets.QGraphicsScene()
+        self.graphicsView.setScene(self.scene)
+        self.scene.setSceneRect(0,0,650,75)
+
+        self.line1to2 = QtWidgets.QGraphicsLineItem(50, 0, 150, 80) #bas x,y, bitis x,y
+        self.line2to1 = QtWidgets.QGraphicsLineItem(150, 0, 50, 80)
+        self.line3to4 = QtWidgets.QGraphicsLineItem(50, 300, 150, 580)  # bas x,y, bitis x,y
+        self.line4to3 = QtWidgets.QGraphicsLineItem(150, 300, 50, 580)
+
+        self.stop = QtWidgets.QGraphicsRectItem(0,0,60,60) #x,y,boyutlar
+
+        self.line1to2_1 = QtWidgets.QGraphicsLineItem(500, 0, 600, 80)
+        self.line2to1_1 = QtWidgets.QGraphicsLineItem(600, 0, 500, 80)
+        self.line3to4_1 = QtWidgets.QGraphicsLineItem(500, 500, 600, 580)
+        self.line4to3_1 = QtWidgets.QGraphicsLineItem(600, 300, 500, 580)
+
+        self.stop.setPos(300,8)
+        self.stop.setBrush(QtGui.QBrush(QtGui.QColor(255, 255, 255)))
+
+        self.pen = QtGui.QPen(QtGui.QColor(255,255,255),10) #renk,kalınlık
+
+        self.line1to2.setPen(self.pen)
+        self.line2to1.setPen(self.pen)
+        self.line1to2_1.setPen(self.pen)
+        self.line2to1_1.setPen(self.pen)
+        self.line3to4.setPen(self.pen)
+        self.line4to3.setPen(self.pen)
+        self.line3to4_1.setPen(self.pen)
+        self.line4to3_1.setPen(self.pen)
+
+        self.scene.addItem(self.line1to2)
+        self.scene.addItem(self.line2to1)
+        self.scene.addItem(self.line1to2_1)
+        self.scene.addItem(self.line2to1_1)
+        self.scene.addItem(self.line3to4)
+        self.scene.addItem(self.line4to3)
+        self.scene.addItem(self.line3to4_1)
+        self.scene.addItem(self.line4to3_1)
+        self.scene.addItem(self.stop)
+        self.btn_tren14.raise_()
+
+
+
+if __name__ == "__main__":
+    app = QtWidgets.QApplication(sys.argv)
+    windows = MainWindows()
+    windows.show()
+    sys.exit(app.exec_())
