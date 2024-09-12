@@ -2,7 +2,7 @@ import socket
 import sys
 import threading
 from time import sleep
-from graphtest import find_shortest
+from graphing import find_shortest
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import pyqtSlot
 from pyexpat.errors import messages
@@ -282,49 +282,59 @@ class MainWindows(QtWidgets.QMainWindow):
 
 
     def createScissors(self):
-        self.graphicsView = QtWidgets.QGraphicsView(self.widget)
-        self.graphicsView.setGeometry(QtCore.QRect(50,70,661,90))
+    self.graphicsView = QtWidgets.QGraphicsView(self.widget)
+    self.graphicsView.setGeometry(QtCore.QRect(50, 70, 661, 90))
 
-        self.scene = QtWidgets.QGraphicsScene()
-        self.graphicsView.setScene(self.scene)
-        self.scene.setSceneRect(0,0,650,75)
+    self.scene = QtWidgets.QGraphicsScene()
+    self.graphicsView.setScene(self.scene)
+    self.scene.setSceneRect(0, 0, 650, 75)
 
-        self.line1to2 = QtWidgets.QGraphicsLineItem(50, 0, 150, 80) #bas x,y, bitis x,y
-        self.line2to1 = QtWidgets.QGraphicsLineItem(150, 0, 50, 80)
-        self.line3to4 = QtWidgets.QGraphicsLineItem(50, 300, 150, 580)  # bas x,y, bitis x,y
-        self.line4to3 = QtWidgets.QGraphicsLineItem(150, 300, 50, 580)
+    # Top tracks
+    self.line1to2 = QtWidgets.QGraphicsLineItem(50, 0, 150, 80)  # bas x,y, bitis x,y
+    self.line2to1 = QtWidgets.QGraphicsLineItem(150, 0, 50, 80)
+    self.line3to4 = QtWidgets.QGraphicsLineItem(50, 300, 150, 580)  # bas x,y, bitis x,y
+    self.line4to3 = QtWidgets.QGraphicsLineItem(150, 300, 50, 580)
 
-        self.stop = QtWidgets.QGraphicsRectItem(0,0,60,60) #x,y,boyutlar
+    self.stop = QtWidgets.QGraphicsRectItem(0, 0, 60, 60)  # x,y,boyutlar
 
-        self.line1to2_1 = QtWidgets.QGraphicsLineItem(500, 0, 600, 80)
-        self.line2to1_1 = QtWidgets.QGraphicsLineItem(600, 0, 500, 80)
-        self.line3to4_1 = QtWidgets.QGraphicsLineItem(500, 500, 600, 580)
-        self.line4to3_1 = QtWidgets.QGraphicsLineItem(600, 300, 500, 580)
+    self.line1to2_1 = QtWidgets.QGraphicsLineItem(500, 0, 600, 80)
+    self.line2to1_1 = QtWidgets.QGraphicsLineItem(600, 0, 500, 80)
+    self.line3to4_1 = QtWidgets.QGraphicsLineItem(500, 500, 600, 580)
+    self.line4to3_1 = QtWidgets.QGraphicsLineItem(600, 300, 500, 580)
 
-        self.stop.setPos(300,8)
-        self.stop.setBrush(QtGui.QBrush(QtGui.QColor(255, 255, 255)))
+    # Bottom tracks
+    self.line1to2_bottom = QtWidgets.QGraphicsLineItem(50, 600, 150, 680)  # bas x,y, bitis x,y
+    self.line2to1_bottom = QtWidgets.QGraphicsLineItem(150, 600, 50, 680)
+    self.line3to4_bottom = QtWidgets.QGraphicsLineItem(50, 900, 150, 1180)  # bas x,y, bitis x,y
+    self.line4to3_bottom = QtWidgets.QGraphicsLineItem(150, 900, 50, 1180)
 
-        self.pen = QtGui.QPen(QtGui.QColor(255,255,255),10) #renk,kalınlık
+    self.stop_bottom = QtWidgets.QGraphicsRectItem(0, 600, 60, 60)  # x,y,boyutlar
 
-        self.line1to2.setPen(self.pen)
-        self.line2to1.setPen(self.pen)
-        self.line1to2_1.setPen(self.pen)
-        self.line2to1_1.setPen(self.pen)
-        self.line3to4.setPen(self.pen)
-        self.line4to3.setPen(self.pen)
-        self.line3to4_1.setPen(self.pen)
-        self.line4to3_1.setPen(self.pen)
+    self.line1to2_1_bottom = QtWidgets.QGraphicsLineItem(500, 600, 600, 680)
+    self.line2to1_1_bottom = QtWidgets.QGraphicsLineItem(600, 600, 500, 680)
+    self.line3to4_1_bottom = QtWidgets.QGraphicsLineItem(500, 1100, 600, 1180)
+    self.line4to3_1_bottom = QtWidgets.QGraphicsLineItem(600, 900, 500, 1180)
 
-        self.scene.addItem(self.line1to2)
-        self.scene.addItem(self.line2to1)
-        self.scene.addItem(self.line1to2_1)
-        self.scene.addItem(self.line2to1_1)
-        self.scene.addItem(self.line3to4)
-        self.scene.addItem(self.line4to3)
-        self.scene.addItem(self.line3to4_1)
-        self.scene.addItem(self.line4to3_1)
-        self.scene.addItem(self.stop)
-        self.btn_tren14.raise_()
+    # Add items to the scene
+    self.scene.addItem(self.line1to2)
+    self.scene.addItem(self.line2to1)
+    self.scene.addItem(self.line3to4)
+    self.scene.addItem(self.line4to3)
+    self.scene.addItem(self.stop)
+    self.scene.addItem(self.line1to2_1)
+    self.scene.addItem(self.line2to1_1)
+    self.scene.addItem(self.line3to4_1)
+    self.scene.addItem(self.line4to3_1)
+
+    self.scene.addItem(self.line1to2_bottom)
+    self.scene.addItem(self.line2to1_bottom)
+    self.scene.addItem(self.line3to4_bottom)
+    self.scene.addItem(self.line4to3_bottom)
+    self.scene.addItem(self.stop_bottom)
+    self.scene.addItem(self.line1to2_1_bottom)
+    self.scene.addItem(self.line2to1_1_bottom)
+    self.scene.addItem(self.line3to4_1_bottom)
+    self.scene.addItem(self.line4to3_1_bottom)
 
 
 
