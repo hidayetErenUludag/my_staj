@@ -1,3 +1,5 @@
+from tkinter.constants import PROJECTING
+
 import matplotlib.pyplot as plt
 import networkx as nx
 
@@ -41,10 +43,4 @@ railway.add_edge("L26M", "L25M", weight=0.1)
 
 def find_shortest(start, finish):
     path = nx.shortest_path(railway, start, finish, "weight")
-    for i in range(len(path)-1):
-        print(path[i])
-        print(path[i+1])
-        print("------------")
     return path
-
-print(find_shortest("L11M", "L25M"))

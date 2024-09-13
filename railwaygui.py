@@ -2,11 +2,13 @@ import math
 import socket
 import sys
 import threading
+from os.path import curdir
 from time import sleep
-from graphtest import find_shortest
+
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import pyqtSlot
-from pyexpat.errors import messages
+
+from graphing import find_shortest
 
 HOST = "127.0.0.1"
 PORT = 5555
@@ -16,9 +18,9 @@ LINE_LEFT = 50
 LINE_RIGHT = 711
 
 LINE_1_Y = 29
-LINE_2_Y = 161
-LINE_3_Y = 244
-LINE_4_Y = 376
+LINE_2_Y = 180
+LINE_3_Y = 280
+LINE_4_Y = 427
 
 LINE_1_DOWN = 69
 LINE_3_DOWN = 284
@@ -87,34 +89,51 @@ class MainWindows(QtWidgets.QMainWindow):
         self.client = client()
         self.client.message_received.connect(self.message_decode)
         self.startServer()
-        self.enemyAnimation = None
+        self.enemyAnimation = QtCore.QParallelAnimationGroup()  # Initialize enemyAnimation
         self.buildMainWidget()
+        self.current_station = "L11M"
+
+    def message_decode(self, station):
+        try:
+            paths = find_shortest(self.current_station, station)  # Use the current station
+            for i, station in enumerate(paths):
+                self.doAnimation(station, self.current_station)
+                print(f"Current station: {self.current_station}")
+                print(f"Next station: {station}")
+                if i > 0:
+                    self.current_station = paths[i]  # Update the current station
+                # Wait for the current animation to finish before starting the next one
+                while self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
+                    QtCore.QCoreApplication.processEvents()
+                current_station = station
+        except Exception as e:
+            print(f"Error in message_decode: {e}")
+
 
 
     def buildRotates(self):
-        self.rotateList["L11M"] = rotates("L11M", X_1, LINE_1_Y)
-        self.rotateList["L12M"] = rotates("L12M", X_2, LINE_1_Y)
-        self.rotateList["L13M"] = rotates("L13M", X_3, LINE_1_Y)
-        self.rotateList["L14M"] = rotates("L14M", X_4, LINE_1_Y)
-        self.rotateList["L15M"] = rotates("L15M", X_1, LINE_3_Y)
-        self.rotateList["L16M"] = rotates("L16M", X_2, LINE_3_Y)
-        self.rotateList["L17M"] = rotates("L17M", X_3, LINE_3_Y)
-        self.rotateList["L18M"] = rotates("L18M", X_4, LINE_3_Y)
-        self.rotateList["L21M"] = rotates("L21M", X_4, LINE_4_Y)
-        self.rotateList["L22M"] = rotates("L22M", X_3, LINE_4_Y)
-        self.rotateList["L23M"] = rotates("L23M", X_2, LINE_4_Y)
-        self.rotateList["L24M"] = rotates("L24M", X_1, LINE_4_Y)
-        self.rotateList["L25M"] = rotates("L25M", X_4, LINE_2_Y)
-        self.rotateList["L26M"] = rotates("L26M", X_3, LINE_2_Y)
-        self.rotateList["L27M"] = rotates("L27M", X_2, LINE_2_Y)
-        self.rotateList["L28M"] = rotates("L28M", X_1, LINE_2_Y)
+        self.rotateList["L11M"] = rotates("L11M", 80, 50)
+        self.rotateList["L12M"] = rotates("L12M", 180, 50)
+        self.rotateList["L13M"] = rotates("L13M", 80, 140)
+        self.rotateList["L14M"] = rotates("L14M", 180, 140)
+        self.rotateList["L15M"] = rotates("L15M", 525, 50)
+        self.rotateList["L16M"] = rotates("L16M", 635, 50)
+        self.rotateList["L17M"] = rotates("L17M", 525, 140)
+        self.rotateList["L18M"] = rotates("L18M", 635, 140)
+        self.rotateList["L19M"] = rotates("L19M", 80, 300)
+        self.rotateList["L20M"] = rotates("L20M", 180, 300)
+        self.rotateList["L21M"] = rotates("L21M", 80, 400)
+        self.rotateList["L22M"] = rotates("L22M", 180, 400)
+        self.rotateList["L23M"] = rotates("L23M", 525, 300)
+        self.rotateList["L24M"] = rotates("L24M", 635, 300)
+        self.rotateList["L25M"] = rotates("L25M", 525, 400)
+        self.rotateList["L26M"] = rotates("L26M", 635, 400)
 
 
     def startServer(self):
         server_thread = threading.Thread(target=self.runServer)
         server_thread.daemon = True
         server_thread.start()
-
 
     def runServer(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -123,46 +142,66 @@ class MainWindows(QtWidgets.QMainWindow):
         print("Server started, waiting for connections...")
         while True:
             client_socket, addr = server.accept()
-            client_thread = threading.Thread(target=self.startServer(), args=(client_socket,))
+            client_thread = threading.Thread(target=self.handle_client, args=(client_socket,))
             client_thread.start()
 
-    """
-    def message_decode(self, station):
-        try:
-            station = self.rotateList[station]
-            print(f"Target station is {station.rotateName}")
-            self.doAnimation(station.x_position, station.y_position)
-        except:
-            print("The station is not on the list")
-"""
+    def handle_client(self, client_socket):
+        while True:
+            try:
+                message = client_socket.recv(MAX_BYTE).decode('utf-8')
+                if message:
+                    self.client.message_received.emit(message)
+                else:
+                    break
+            except Exception as e:
+                print(f"Client connection error: {e}")
+                break
+        client_socket.close()
 
     def path_lender(self, go):
-        paths = find_shortest("L11M", go)
         try:
-            for i in range((len(paths)) - 1):
-                self.doAnimation(paths[i + 1])
-        except:
-            print("opsy daisy")
+            paths = find_shortest("L11M", go)
+            current_station = "L11M"
+            for i, station in enumerate(paths):
+                if i > 1:
+                    current_station = paths[i]
+                self.doAnimation(station, current_station)
+                # Wait for the current animation to finish before starting the next one
+                while self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
+                    QtCore.QCoreApplication.processEvents()
+        except Exception as e:
+            print(f"Error in path_lender: {e}")
 
-    @pyqtSlot(str)
-    def doAnimation(self, target):
-        current_x = self.train14.x()
-        current_y = self.train14.y()
+    @pyqtSlot(str, str)
+    def doAnimation(self, target, current_station):
+        current_x = self.btn_tren14.x()
+        current_y = self.btn_tren14.y()
+        self.btn_tren14.raise_()
         if self.enemyAnimation and self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
             self.enemyAnimation.stop()
         self.enemyAnimation.clear()
-        if target != ("L18M" or "L19M"):
-            try:
-                animation = QtCore.QPropertyAnimation(self.train14, b'pos')
-                duration = (math.sqrt((self.rotateList[target].x_position - current_x)**2 +
-                                   (self.rotateList[target].y_position - current_y)**2)) * 5
-                animation.setDuration(duration)
-                animation.setStartValue(QtCore.QPoint(current_x, current_y))
-                animation.setEndValue(QtCore.QPoint(self.rotateList[target].x_position, self.rotateList[target].y_position))
-                self.enemyAnimation.addAnimation(animation)
-                self.enemyAnimation.start()
-            except Exception as e:
-                print(f"Error: {e}")
+        if target in self.rotateList:
+            if target == "L19M" and current_station == "L16M":
+                # Special case for L19M: instantly move the train to L19M
+                self.btn_tren14.move(self.rotateList["L19M"].x_position, self.rotateList["L19M"].y_position)
+            elif target == "L18M" and current_station == "L21M":
+                # Special case for L19M: instantly move the train to L19M
+                self.btn_tren14.move(self.rotateList["L18M"].x_position, self.rotateList["L18M"].y_position)
+            else:
+                try:
+                    animation = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
+                    duration = int((math.sqrt((self.rotateList[target].x_position - current_x) ** 2 +
+                                          (self.rotateList[target].y_position - current_y) ** 2)) * 5)
+                    animation.setDuration(duration)
+                    animation.setStartValue(QtCore.QPoint(current_x, current_y))
+                    animation.setEndValue(
+                        QtCore.QPoint(self.rotateList[target].x_position, self.rotateList[target].y_position))
+                    self.enemyAnimation.addAnimation(animation)
+                    self.enemyAnimation.start()
+                except Exception as e:
+                    print(f"Error: {e}")
+        current_station = target
+
 
 
     @pyqtSlot()
