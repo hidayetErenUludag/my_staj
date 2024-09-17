@@ -2,16 +2,15 @@ import math
 import socket
 import sys
 import threading
-from os.path import curdir
+import time
 from time import sleep
-
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import pyqtSlot
-
-from graphing import find_shortest
+from graphtest import find_shortest
 
 HOST = "127.0.0.1"
 PORT = 5555
+PORT2 = 5556
 MAX_BYTE = 1024
 
 LINE_LEFT = 50
@@ -37,9 +36,11 @@ X_2 = 180
 X_3 = 525
 X_4 = 635
 
-TRAIN_X = 671 #50+661-40
-#TRAIN_X = 661
+TRAIN_X = 671
 TRAIN_Y = 376
+
+global current_station
+
 
 class rotates:
     def __init__(self, rotateName, x_position, y_position):
@@ -49,6 +50,7 @@ class rotates:
 
 class client(QtCore.QObject):
     message_received = QtCore.pyqtSignal(str)
+    alarm_received = QtCore.pyqtSignal(str)
     def __init__(self):
         super().__init__()
         self.client_socket = None
@@ -88,27 +90,27 @@ class MainWindows(QtWidgets.QMainWindow):
         self.buildRotates()
         self.client = client()
         self.client.message_received.connect(self.message_decode)
+        self.alarm = client()
+        self.alarm.alarm_received.connect(self.alarm_processor)
         self.startServer()
         self.enemyAnimation = QtCore.QParallelAnimationGroup()  # Initialize enemyAnimation
         self.buildMainWidget()
         self.current_station = "L11M"
+        self.alarm_status = False
 
     def message_decode(self, station):
         try:
             paths = find_shortest(self.current_station, station)  # Use the current station
             for i, station in enumerate(paths):
                 self.doAnimation(station, self.current_station)
-                print(f"Current station: {self.current_station}")
-                print(f"Next station: {station}")
                 if i > 0:
                     self.current_station = paths[i]  # Update the current station
                 # Wait for the current animation to finish before starting the next one
                 while self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
                     QtCore.QCoreApplication.processEvents()
-                current_station = station
+
         except Exception as e:
             print(f"Error in message_decode: {e}")
-
 
 
     def buildRotates(self):
@@ -132,8 +134,10 @@ class MainWindows(QtWidgets.QMainWindow):
 
     def startServer(self):
         server_thread = threading.Thread(target=self.runServer)
+        alarm_thread = threading.Thread(target=self.runAlarmServer)
         server_thread.daemon = True
         server_thread.start()
+        alarm_thread.start()
 
     def runServer(self):
         server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -158,50 +162,92 @@ class MainWindows(QtWidgets.QMainWindow):
                 break
         client_socket.close()
 
-    def path_lender(self, go):
-        try:
-            paths = find_shortest("L11M", go)
-            current_station = "L11M"
-            for i, station in enumerate(paths):
-                if i > 1:
-                    current_station = paths[i]
-                self.doAnimation(station, current_station)
-                # Wait for the current animation to finish before starting the next one
-                while self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
-                    QtCore.QCoreApplication.processEvents()
-        except Exception as e:
-            print(f"Error in path_lender: {e}")
+    def runAlarmServer(self):
+        server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        server.bind((HOST, PORT2))
+        server.listen(5)
+        print("Alarm server started, waiting for connections...")
+        while True:
+            client_socket, addr = server.accept()
+            client_thread = threading.Thread(target=self.handle_alarm, args=(client_socket,))
+            client_thread.start()
 
-    @pyqtSlot(str, str)
-    def doAnimation(self, target, current_station):
+    def handle_alarm(self, client_socket):
+        while True:
+            try:
+                message = client_socket.recv(MAX_BYTE).decode('utf-8')
+                if message:
+                    self.alarm_status = True
+                    self.alarm.alarm_received.emit(message)
+                else:
+                    break
+            except Exception as e:
+                print(f"Client connection error: {e}")
+                break
+        client_socket.close()
+
+    def alarm_processor(self, message):
+        self.enemyAnimation.stop()
+        self.enemyAnimation.clear()
         current_x = self.btn_tren14.x()
         current_y = self.btn_tren14.y()
-        self.btn_tren14.raise_()
-        if self.enemyAnimation and self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
-            self.enemyAnimation.stop()
-        self.enemyAnimation.clear()
-        if target in self.rotateList:
-            if target == "L19M" and current_station == "L16M":
-                # Special case for L19M: instantly move the train to L19M
-                self.btn_tren14.move(self.rotateList["L19M"].x_position, self.rotateList["L19M"].y_position)
-            elif target == "L18M" and current_station == "L21M":
-                # Special case for L19M: instantly move the train to L19M
-                self.btn_tren14.move(self.rotateList["L18M"].x_position, self.rotateList["L18M"].y_position)
-            else:
-                try:
-                    animation = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
-                    duration = int((math.sqrt((self.rotateList[target].x_position - current_x) ** 2 +
-                                          (self.rotateList[target].y_position - current_y) ** 2)) * 5)
-                    animation.setDuration(duration)
-                    animation.setStartValue(QtCore.QPoint(current_x, current_y))
-                    animation.setEndValue(
-                        QtCore.QPoint(self.rotateList[target].x_position, self.rotateList[target].y_position))
-                    self.enemyAnimation.addAnimation(animation)
-                    self.enemyAnimation.start()
-                except Exception as e:
-                    print(f"Error: {e}")
-        current_station = target
+        animation = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
+        if message == "Fire":
+            if self.enemyAnimation and self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
+                self.enemyAnimation.stop()
+            self.enemyAnimation.clear()
 
+            animation.setStartValue(QtCore.QPoint(current_x, current_y))
+            animation.setEndValue(QtCore.QPoint(self.rotateList[current_station].x_position, self.rotateList[current_station].y_position))
+            self.enemyAnimation.addAnimation(animation)
+            self.btn_tren14.setStyleSheet("background-color: rgb(255, 0, 0);")
+            self.enemyAnimation.start()
+
+        if message == "Obstruction":
+            self.stopAnimation()
+            self.btn_tren14.setStyleSheet("background-color: rgb(255, 0, 0);")
+
+        if message == "Alarm Cleared":
+            self.alarm_status = False
+            self.enemyAnimation.clear()
+            self.btn_tren14.setStyleSheet("background-color: rgb(85, 255, 127);")
+ 
+
+    @pyqtSlot(str, str)
+    def doAnimation(self, target, visited_station):
+        if not self.alarm_status:
+            print(self.alarm_status)
+            self.btn_tren14.setStyleSheet("background-color: rgb(85, 255, 127);")
+            current_x = self.btn_tren14.x()
+            current_y = self.btn_tren14.y()
+            self.btn_tren14.raise_()
+            if self.enemyAnimation and self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
+                self.enemyAnimation.stop()
+            self.enemyAnimation.clear()
+            if target in self.rotateList:
+                if target == "L19M" and visited_station == "L16M":
+                    # Special case for L19M: instantly move the train to L19M
+                    self.btn_tren14.move(self.rotateList["L19M"].x_position, self.rotateList["L19M"].y_position)
+                elif target == "L18M" and visited_station == "L21M":
+                    # Special case for L19M: instantly move the train to L19M
+                    self.btn_tren14.move(self.rotateList["L18M"].x_position, self.rotateList["L18M"].y_position)
+                else:
+                    try:
+                        animation = QtCore.QPropertyAnimation(self.btn_tren14, b'pos')
+                        duration = int((math.sqrt((self.rotateList[target].x_position - current_x) ** 2 +
+                                              (self.rotateList[target].y_position - current_y) ** 2)) * 5)
+                        animation.setDuration(duration)
+                        animation.setStartValue(QtCore.QPoint(current_x, current_y))
+                        animation.setEndValue(
+                            QtCore.QPoint(self.rotateList[target].x_position, self.rotateList[target].y_position))
+                        self.enemyAnimation.addAnimation(animation)
+                        self.enemyAnimation.start()
+                    except Exception as e:
+                        print(f"Error: {e}")
+        else:
+            print("Alarm response")
+            self.stopAnimation()
+            return 0
 
 
     @pyqtSlot()
@@ -414,9 +460,11 @@ class MainWindows(QtWidgets.QMainWindow):
         self.btn_tren14.raise_()
 
 
-
 if __name__ == "__main__":
     app = QtWidgets.QApplication(sys.argv)
     windows = MainWindows()
+    start = time.time()
     windows.show()
+    end = time.time()
+    print(end-start)
     sys.exit(app.exec_())
