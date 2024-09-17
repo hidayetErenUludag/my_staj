@@ -26,7 +26,7 @@ class TrainServerGUI(QMainWindow):
 
     def initUI(self):
         self.setWindowTitle('Train Server')
-        self.setGeometry(100, 100, 300, 200)
+        self.setGeometry(200, 200, 400, 300)
 
         central_widget = QWidget()
         self.setCentralWidget(central_widget)
