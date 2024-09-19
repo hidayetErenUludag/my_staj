@@ -89,7 +89,7 @@ class MainWindows(QtWidgets.QMainWindow):
         self.rotateList = {}
         self.buildRotates()
         self.client = client()
-        self.client.message_received.connect(self.message_decode)
+        self.client.message_received.connect(self.path_lender)
         self.alarm = client()
         self.alarm.alarm_received.connect(self.alarm_processor)
         self.startServer()
@@ -98,17 +98,21 @@ class MainWindows(QtWidgets.QMainWindow):
         self.current_station = "L11M"
         self.alarm_status = False
 
-    def message_decode(self, station):
+    def path_lender(self, station):
         try:
+            self.enemyAnimation.stop()
+            self.enemyAnimation.clear()
             paths = find_shortest(self.current_station, station)  # Use the current station
+            print(f"Path: {paths}")
             for i, station in enumerate(paths):
-                self.doAnimation(station, self.current_station)
-                print(station)
-                if i > 0:
-                    self.current_station = paths[i - 1]  # Update the current station
-                # Wait for the current animation to finish before starting the next one
-                while self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
-                    QtCore.QCoreApplication.processEvents()
+                if not self.alarm_status:
+                    self.doAnimation(station, self.current_station)
+                    print(station)
+                    print(self.current_station)
+                    self.current_station = station  # Update the current station
+                    # Wait for the current animation to finish before starting the next one
+                    while self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
+                        QtCore.QCoreApplication.processEvents()
         except Exception as e:
             print(f"Error in message_decode: {e}")
 
@@ -215,7 +219,8 @@ class MainWindows(QtWidgets.QMainWindow):
 
     @pyqtSlot(str, str)
     def doAnimation(self, target, visited_station):
-
+        if self.alarm_status:
+            target = None
         if not self.alarm_status:
             print(self.alarm_status)
             self.btn_tren14.setStyleSheet("background-color: rgb(85, 255, 127);")
