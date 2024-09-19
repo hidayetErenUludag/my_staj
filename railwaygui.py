@@ -6,7 +6,7 @@ import time
 from time import sleep
 from PyQt5 import QtWidgets, QtCore, QtGui
 from PyQt5.QtCore import pyqtSlot
-from graphtest import find_shortest
+from graphing import find_shortest
 
 HOST = "127.0.0.1"
 PORT = 5555
@@ -103,15 +103,14 @@ class MainWindows(QtWidgets.QMainWindow):
             paths = find_shortest(self.current_station, station)  # Use the current station
             for i, station in enumerate(paths):
                 self.doAnimation(station, self.current_station)
+                print(station)
                 if i > 0:
-                    self.current_station = paths[i]  # Update the current station
+                    self.current_station = paths[i - 1]  # Update the current station
                 # Wait for the current animation to finish before starting the next one
                 while self.enemyAnimation.state() == QtCore.QAbstractAnimation.Running:
                     QtCore.QCoreApplication.processEvents()
-
         except Exception as e:
             print(f"Error in message_decode: {e}")
-
 
     def buildRotates(self):
         self.rotateList["L11M"] = rotates("L11M", 80, 50)
@@ -198,7 +197,8 @@ class MainWindows(QtWidgets.QMainWindow):
             self.enemyAnimation.clear()
 
             animation.setStartValue(QtCore.QPoint(current_x, current_y))
-            animation.setEndValue(QtCore.QPoint(self.rotateList[current_station].x_position, self.rotateList[current_station].y_position))
+            animation.setEndValue(QtCore.QPoint(self.rotateList[self.current_station].x_position,
+                                                self.rotateList[self.current_station].y_position))
             self.enemyAnimation.addAnimation(animation)
             self.btn_tren14.setStyleSheet("background-color: rgb(255, 0, 0);")
             self.enemyAnimation.start()
@@ -211,10 +211,11 @@ class MainWindows(QtWidgets.QMainWindow):
             self.alarm_status = False
             self.enemyAnimation.clear()
             self.btn_tren14.setStyleSheet("background-color: rgb(85, 255, 127);")
- 
+
 
     @pyqtSlot(str, str)
     def doAnimation(self, target, visited_station):
+
         if not self.alarm_status:
             print(self.alarm_status)
             self.btn_tren14.setStyleSheet("background-color: rgb(85, 255, 127);")
